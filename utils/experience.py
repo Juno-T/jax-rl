@@ -57,12 +57,12 @@ class Accumulator:
       self._episodes.append(self._timesteps)
       self._new_episode()
     
-  def sample_one_ep(self, current=False, previous=False, rng_key=None):
+  def sample_one_ep(self, current=False, last_episode=False, rng_key=None):
     if current:
       actions, timesteps = jax.tree_multimap(lambda *ts: np.stack(ts),
                                            *self._timesteps)
     
-    elif previous:
+    elif last_episode:
       assert(len(self._episodes)>=1)
       actions, timesteps = jax.tree_multimap(lambda *ts: np.stack(ts),
                                            *self._episodes[-1])
