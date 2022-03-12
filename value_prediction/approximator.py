@@ -20,10 +20,10 @@ class tabularApproximator:
   def v(self, state):
     """
     """
-    assert(len(state) == len(self._state_range))
+    # assert(len(state) == len(self._state_range))
     return self.table[tuple(self.indexof(state))]
 
-  @partial(jax.jit, static_argnums=(0,))
+  # @partial(jax.jit, static_argnums=(0,))
   def indexof(self, state):
     idx = []
     for i in range(len(state)):
@@ -57,8 +57,12 @@ class tabularQApproximator(tabularApproximator):
       action_range = [action_range]
     super().__init__(list(state_range)+list(action_range))
 
-  def q(self, state, action=None):
+  def q(self, state, action):
     return super().v(self.parse_state_action(state, action))
+
+  def q_all(self, state):
+    return super().v(state)
+
 
   def update(self, state, action, value):
     return super().update(self.parse_state_action(state,action), value)

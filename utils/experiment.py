@@ -23,18 +23,19 @@ class Trainer:
     self.writer = SummaryWriter(logdir)
     
 
-  def train(self, agent,
+  def train(self, rngkey, agent,
     train_episodes, batch_size=1, evaluate_every=2, eval_episodes=1):
 
     agent.train_init()
     for episode_number in tqdm(range(train_episodes), bar_format='{l_bar}{bar:15}{r_bar}{bar:-15b}'):
+      rngkey, act_rngkey, eval_rngkey = random.split(rngkey, 3)
       observation = jnp.array(self.env.reset())
       self.acc.push(None, TimeStep(obsv = observation))
       done=False
       agent.episode_init(observation)
       while not done:
 
-        action, discount = agent.act(observation)
+        action, discount = agent.act(observation, act_rngkey)
         observation, reward, done, info = self.env.step(action)
         self.acc.push(action, TimeStep(
             int(done),
@@ -49,19 +50,20 @@ class Trainer:
       self.writer.add_scalar('train/reward', jnp.sum(timesteps.reward).item(), episode_number)
       agent.learn_one_ep(episode)
       if episode_number%evaluate_every==0:
-        self.eval(agent, eval_episodes, episode_number)
+        self.eval(eval_rngkey, agent, eval_episodes, episode_number)
       
       
 
-  def eval(self, agent, eval_episodes, episode_number):
+  def eval(self, rngkey, agent, eval_episodes, episode_number):
     for ep in range(eval_episodes):
+      rngkey, act_rngkey = random.split(rngkey)
       observation = jnp.array(self.env.reset())
       # self.acc.push(None, TimeStep(obsv = observation))
       done=False
       agent.episode_init(observation)
       rewards = []
       while not done:
-        action, discount = agent.act(observation)
+        action, discount = agent.act(observation, act_rngkey)
         observation, reward, done, info = self.env.step(action)
         rewards.append(reward)
     rewards = jnp.array(rewards)
