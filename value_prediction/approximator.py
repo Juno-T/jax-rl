@@ -5,10 +5,10 @@ from functools import partial
 
 
 class tabularApproximator:
-  def __init__(self, state_range):
+  def __init__(self, state_range, ordered_state=False):
     self._state_range = [jnp.sort(jnp.array(r)) for r in state_range]
     self.table = jnp.zeros([len(r) for r in state_range], dtype=jnp.float32)
-
+    self.ordered_state = ordered_state
 
   def init_table(self, table):
     """ 
@@ -25,6 +25,8 @@ class tabularApproximator:
 
   # @partial(jax.jit, static_argnums=(0,))
   def indexof(self, state):
+    if self.ordered_state:
+      return state.astype(jnp.int32)
     idx = []
     for i in range(len(state)):
       idx.append(jnp.searchsorted(self._state_range[i], state[i]))
@@ -50,12 +52,12 @@ class tabularApproximator:
     # self.table = _batch_update_table(self.table, states, values)
 
 class tabularQApproximator(tabularApproximator):
-  def __init__(self, state_range, action_range):
+  def __init__(self, state_range, action_range, ordered_state=False):
     try:
       _ = len(action_range)
     except:
       action_range = [action_range]
-    super().__init__(list(state_range)+list(action_range))
+    super().__init__(list(state_range)+list(action_range), ordered_state)
 
   def q(self, state, action):
     return super().v(self.parse_state_action(state, action))
@@ -77,7 +79,7 @@ class tabularQApproximator(tabularApproximator):
     action: array-like
     """
     if action is None:
-      return state
+      return jnp.array(state)
     try:
       _ = len(action)
     except:

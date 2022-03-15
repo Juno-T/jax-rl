@@ -74,7 +74,8 @@ class epsilonGreedyAgent(Agent):
     self.action_space = env.action_space
     self.appr = approximator.tabularQApproximator(
         [np.arange(sp.n) for sp in self.state_space],
-        [np.arange(self.action_space.n)])
+        [np.arange(self.action_space.n)],
+        ordered_state = True)
     self.appr_q_all_batch = jax.jit(jax.vmap(self.appr.q_all))
     self.lr = learning_rate
     self.discount=0.9
@@ -105,4 +106,7 @@ class epsilonGreedyAgent(Agent):
     def _batched_q_learning_update(*args):
       return q.q_learning(*args[:5])*args[5]+args[0][args[1]]
     updated = _batched_q_learning_update(q_tm1, a_tm1, r_t, q_t, self.discount, self.lr)
+    # error = jax.vmap(q.q_learning, in_axes=(0,0,0,0,None))(q_tm1, a_tm1, r_t, q_t, self.discount)
+    # qa_indices = tuple(jnp.stack((jnp.arange(len(a_tm1)),a_tm1), axis=0))
+    # updated = error*self.lr + q_tm1[qa_indices]
     self.appr.batch_update(s_tm1, a_tm1, updated)
