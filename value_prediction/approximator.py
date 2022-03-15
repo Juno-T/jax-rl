@@ -85,3 +85,34 @@ class tabularQApproximator(tabularApproximator):
     except:
       action = [action]
     return jnp.concatenate((jnp.array(state), jnp.array(action)), axis=0)
+
+
+class LinearApproximator:
+  def __init__(self, in_dim: int, out_dim: int = 1):
+    self.in_dim = in_dim
+    self.out_dim = out_dim
+    self.W = jnp.zeros((self.out_dim, self.in_dim))
+
+  def random_init_weight(self, rng_key):
+    self.W = jax.random.normal(rng_key, (self.out_dim, self.in_dim))
+
+  def assign_W(self, new_W):
+    self.W = new_W
+
+  @jax.jit
+  def v(weight, states):
+    return weight @ states
+
+  @jax.jit
+  def batched_MSEloss(weight, states, a_tm1, targets):
+    """
+      diff by w and get (v_w-v_target)*(dv_wdw)
+    """
+    qa_indices = tuple(jnp.stack((jnp.arange(len(a_tm1)),a_tm1), axis=0))
+    error = jax.vmap(LinearApproximator.v, in_axes=[None,0])(weight, states)[qa_indices] - targets
+    return jnp.sum((error**2))/len(targets)/2
+
+  @jax.jit
+  def batched_weight_update(weight, states, a_tm1, targets):
+    value, grad = jax.value_and_grad(LinearApproximator.batched_MSEloss)(weight, states, a_tm1, targets)
+    return grad, value

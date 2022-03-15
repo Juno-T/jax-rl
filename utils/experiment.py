@@ -21,13 +21,17 @@ class Trainer:
     self.env = env
     self.acc = accumulator
     self.writer = SummaryWriter(logdir)
+    self.trained_ep = 0
     
 
   def train(self, rngkey, agent,
-    train_episodes, batch_size=1, evaluate_every=2, eval_episodes=1):
+    train_episodes, batch_size=1, evaluate_every=2, eval_episodes=1, is_continue=False):
 
-    agent.train_init()
-    for episode_number in tqdm(range(train_episodes), bar_format='{l_bar}{bar:15}{r_bar}{bar:-15b}'):
+    rngkey, init_rngkey = random.split(rngkey)
+    if not is_continue:
+      self.trained_ep=0
+      agent.train_init(init_rngkey)
+    for episode_number in tqdm(range(self.trained_ep, self.trained_ep+train_episodes), bar_format='{l_bar}{bar:15}{r_bar}{bar:-15b}'):
       rngkey, act_rngkey, eval_rngkey = random.split(rngkey, 3)
       observation = jnp.array(self.env.reset())
       self.acc.push(None, TimeStep(obsv = observation))
@@ -51,7 +55,7 @@ class Trainer:
       agent.learn_one_ep(episode)
       if episode_number%evaluate_every==0:
         self.eval(eval_rngkey, agent, eval_episodes, episode_number)
-      
+    self.trained_ep += train_episodes
       
 
   def eval(self, rngkey, agent, eval_episodes, episode_number):
