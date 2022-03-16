@@ -116,3 +116,9 @@ class LinearApproximator:
   def batched_weight_update(weight, states, a_tm1, targets):
     value, grad = jax.value_and_grad(LinearApproximator.batched_MSEloss)(weight, states, a_tm1, targets)
     return grad, value
+
+  def manual_weight_gradient(weight, state, a_tm1, target):
+    vw = LinearApproximator.v(weight, state)
+    dvdw = jnp.zeros_like(weight).at[a_tm1,:].set(1)*state
+    error = vw[a_tm1]-target
+    return error*dvdw, error**2

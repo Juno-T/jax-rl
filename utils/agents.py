@@ -29,6 +29,12 @@ class Agent(ABC):
   def act(self, observation, rngkey=None):
     pass
 
+  def eval_act(self, observation, rngkey=None):
+    return self.act(observation, rngkey)
+
+  def write(self, writer, episode_number):
+    pass
+
   @abstractmethod
   def learn_one_ep(self, episode):
     pass
@@ -120,8 +126,20 @@ class epsLinearAgent(Agent):
   """
   Agent acts (behavior policy) with epsilon greedy.
   Agent learns with q learning with linear function approximator.
+
+  This is deadly triad agent:
+    - bootstrap               (in q_learning)
+    - off policy              (q_learning use greedy policy)
+    - function approximation  (linear)
+
+  Hyperparameters for Cartpole-v1:
+    eps = 1
+    eps_decay_rate=1-1e-2
+    learning_rate=0.1
+    lr_decay=0.97
+    init weight with random uniform times 1e-3
   """
-  def __init__(self, env, epsilon, learning_rate=0.1):
+  def __init__(self, env, epsilon, eps_decay_rate=None, learning_rate=0.1, lr_decay=1):
     self.env = env
     self.state_space = env.observation_space
     self.action_space = env.action_space
@@ -132,22 +150,40 @@ class epsLinearAgent(Agent):
       self.state_max = jnp.array([sp.n-1 for sp in self.state_space])
     self.appr = LinearApproximator(len(self.state_max), self.action_space.n)
     self.appr_q_all_batch = jax.jit(jax.vmap(LinearApproximator.v, in_axes=[None, 0]))
-    self.lr = learning_rate
+    self.init_lr = learning_rate
+    self.lr_decay = lr_decay
     self.discount=0.9
-    self.epsilon = epsilon
+    self.init_epsilon = epsilon
+    self.eps_decay_rate = eps_decay_rate
+    self.episode_number = 0
+    self.recent_loss=0
 
   def train_init(self, rng_key):
-    self.appr.random_init_weight(rng_key)
-    # self.appr.assign_W(jnp.zeros_like(self.appr.W))
+    self.appr.assign_W(random.uniform(rng_key, self.appr.W.shape)*1e-3)
+    self.episode_number = 0
+    self.epsilon = self.init_epsilon
+    self.lr = self.init_lr
 
   def episode_init(self, initial_observation):
-    pass
+    self.episode_number+=1
 
   def act(self, observation, rngkey):
     q_t = LinearApproximator.v(self.appr.W, jnp.array(observation))
     argmax_a = jnp.argmax(q_t)
     rn = random.uniform(rngkey)
-    return int( (rn<self.epsilon)* self.action_space.sample() + (rn>=self.epsilon)*argmax_a), self.discount
+    action = int( (rn<self.epsilon)* self.action_space.sample() + (rn>=self.epsilon)*argmax_a)
+    return action, self.discount
+
+  def opt_step(self):
+    self.episode_number+=1
+    self.epsilon *= self.eps_decay_rate
+    self.epsilon = max(self.epsilon, 0.1)
+    self.lr *= self.lr_decay
+
+  def eval_act(self, observation, rngkey):
+    q_t = LinearApproximator.v(self.appr.W, jnp.array(observation))
+    argmax_a = jnp.argmax(q_t)
+    return int(argmax_a), self.discount
 
   def learn_one_ep(self, episode):
     a_tm1, timesteps = episode
@@ -161,7 +197,22 @@ class epsLinearAgent(Agent):
 
     targets = jax.vmap(q.q_learning_target, in_axes=[0,0,None])(r_t, q_t, self.discount)
     grad, loss = LinearApproximator.batched_weight_update(self.appr.W, s_tm1, a_tm1, targets)
-    self.appr.assign_W(self.appr.W - self.lr*grad)
+    self.recent_loss = loss
+    # grads, losses = [], []
+    # for i in range(len(s_tm1)):
+    #   grad, loss = LinearApproximator.manual_weight_gradient(self.appr.W, s_tm1[i], a_tm1[i], targets[i])
+    #   losses.append(loss)
+    #   grads.append(grad)
+    # grad = jnp.sum(jnp.array(grads), axis=0)
+    # self.recent_loss = jnp.mean(jnp.array(losses))
+    assert(grad.shape ==  self.appr.W.shape)
+    self.appr.assign_W(self.appr.W + self.lr*grad)
+    self.opt_step()
 
   def norm_state(self, state):
     return state/self.state_max
+
+
+  def write(self, writer, episode_number):
+    writer.add_scalar('train/epsilon', self.epsilon, episode_number)
+    writer.add_scalar('train/loss', self.recent_loss, episode_number)

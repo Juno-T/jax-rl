@@ -55,6 +55,7 @@ class Trainer:
       agent.learn_one_ep(episode)
       if episode_number%evaluate_every==0:
         self.eval(eval_rngkey, agent, eval_episodes, episode_number)
+      agent.write(self.writer, episode_number)
     self.trained_ep += train_episodes
       
 
@@ -67,7 +68,7 @@ class Trainer:
       agent.episode_init(observation)
       rewards = []
       while not done:
-        action, discount = agent.act(observation, act_rngkey)
+        action, discount = agent.eval_act(observation, act_rngkey)
         observation, reward, done, info = self.env.step(action)
         rewards.append(reward)
     rewards = jnp.array(rewards)
