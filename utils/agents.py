@@ -145,7 +145,7 @@ class epsLinearAgent(Agent):
     self.action_space = env.action_space
     if hasattr(self.state_space, 'high'):
       # self.state_max = self.state_space.high
-      self.state_max = jnp.array([4.8, 100, 0.42, 100])
+      self.state_max = jnp.array([4.8, 10, 0.42, 10])
     else:
       self.state_max = jnp.array([sp.n-1 for sp in self.state_space])
     self.appr = LinearApproximator(len(self.state_max), self.action_space.n)
