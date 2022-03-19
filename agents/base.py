@@ -4,6 +4,7 @@ import time
 import numpy as np
 import jax
 import jax.numpy as jnp
+from value_prediction import approximator, td
 
 class Agent(ABC):
   def __init__(self):
