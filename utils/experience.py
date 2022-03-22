@@ -3,6 +3,7 @@ from typing import NamedTuple, Any
 
 import numpy as np
 import jax
+import jax.numpy as jnp
 from jax import random
 
 class TimeStep(NamedTuple):
@@ -11,6 +12,47 @@ class TimeStep(NamedTuple):
   reward: float = 0.0
   discount: float = 1.0
 
+class Transition(NamedTuple):
+  s_tm1: Any
+  a_tm1: Any
+  s_t: Any
+  r_t: float = 0.0
+  trace: Any = None # For future implementation of traces?
+  priority: float =1 # For future priority sampling implementation
+
+class NP_deque():
+  """
+    Works, faster indexing than for loop over deque.
+    But isn't faster than deque in Accumulator since the bottle neck is `multimap`
+  """
+  def __init__(self, maxlen):
+    self.maxlen = maxlen
+    self.reset()
+
+
+  def reset(self):
+    self._storage = np.array([None]*self.maxlen, dtype=object)
+    self._head = -1
+
+  def add(self, element):
+    self._head+=1
+    self._storage[self._head%self.maxlen] = element
+
+  def at(self, index):
+    """
+    support both single and multiple indexing
+    """
+    if isinstance(index, jnp.ndarray):
+      index = np.asarray(index)
+    return self._storage[index]
+
+  def get_random_batch(self, rng_key, batch_size):
+    assert(self._head+1>0)
+    indices = np.asarray(random.randint(rng_key, (batch_size,), 0, self.size()))
+    return self._storage[indices]
+
+  def size(self):
+    return min(self._head+1, self.maxlen)
 
 # Modified from Deepmind/rlax example
 class Accumulator:
@@ -35,14 +77,25 @@ class Accumulator:
 
   """
 
-  def __init__(self, max_t, max_ep):
+  def __init__(self, max_t, max_ep, max_transition):
     self._episodes = collections.deque(maxlen=max_ep)
+    self._transitions = NP_deque(maxlen=max_transition)
     self._max_t = max_t
+    self._last_timestep = None
     self._prev_ep_len = 0
     self._new_episode()
 
+
   def _new_episode(self):
     self._timesteps = collections.deque(maxlen = self._max_t)
+
+  def _add_transition(self, a_tm1, timestep_t):
+    self._transitions.add(Transition(
+      s_tm1=self._last_timestep.obsv,
+      a_tm1 = a_tm1,
+      s_t = timestep_t.obsv,
+      r_t = timestep_t.reward
+    ))
 
   def push(self, action : Any, timestep: TimeStep):
     # Replace `None`s with zeros as these will be put into NumPy arrays.
@@ -53,9 +106,15 @@ class Accumulator:
         discount=0. if timestep.discount is None else timestep.discount,
     )
     self._timesteps.append((a_tm1, timestep_t))
+
+    if self._last_timestep is not None:
+      self._add_transition(a_tm1, timestep_t)
+    self._last_timestep = timestep_t
+
     if timestep_t.step_type: # terminal
       self._episodes.append(self._timesteps)
       self._new_episode()
+      self._last_timestep = None
     
   def sample_one_ep(self, current=False, last_episode=False, rng_key=None):
     if current:
@@ -73,6 +132,13 @@ class Accumulator:
       actions, timesteps = jax.tree_multimap(lambda *ts: np.stack(ts),
                                            *self._episodes[ep_idx])
     return actions, timesteps
+
+  def sample_one_transition(self, rng_key):
+    return self._transitions.get_random_batch(rng_key, 1)[0]
+
+  def sample_batch_transtions(self, rng_key, batch_size):
+    return jax.tree_multimap(lambda *ts: np.stack(ts),
+                              *self._transitions.get_random_batch(rng_key, batch_size))
 
   def len_ep(self):
     return len(self._episodes)

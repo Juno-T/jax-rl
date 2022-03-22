@@ -27,11 +27,13 @@ class Agent(ABC):
     return self.act(observation, rngkey)
 
   def write(self, writer, episode_number):
-    pass
+    raise("Not implemented")
 
-  @abstractmethod
   def learn_one_ep(self, episode):
-    pass
+    raise("Not implemented")
+
+  def learn_batch_transitions(self, transitions):
+    raise("Not implemented")
 
 class RandomAgent(Agent):
   def __init__(self, env, learning_rate=0.1):
