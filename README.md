@@ -8,42 +8,42 @@ Hands-on project after finishing [Deepmind's RL course](https://youtube.com/play
 
 **Utilities**:
 - Experience accumulator
-  - [x] by episodes
-  - [ ] by transitions (:construction: in progress)
-- [x] Training experiment
+  - :heavy_check_mark: by episodes
+  - :black_square_button: by transitions (:construction: in progress)
+- :heavy_check_mark: Training experiment
 
   
 **Environments**:
 - gym
-  - [x] Black-jack
-  - [x] Cartpole
-  - [ ] Atari ?
+  - :heavy_check_mark: Black-jack
+  - :heavy_check_mark: Cartpole
+  - :black_square_button: Atari ?
 - mujoco ?
 - [evogym](https://github.com/EvolutionGym/evogym) (so cool, must try)
 
 **Algorithms**:
 - Value function approximator
-  - [x] Tabular
-  - [x] Linear
-  - [ ] Neural Nets (:construction: in progress)
+  - :heavy_check_mark: Tabular
+  - :heavy_check_mark: Linear
+  - :black_square_button: Neural Nets (:construction: in progress)
 - Value approximation/heuristic
   - TD
-    - [x] TD(0)
-    - [x] n-step TD
-    - [x] TD($\lambda$)
+    - :heavy_check_mark: TD(0)
+    - :heavy_check_mark: n-step TD
+    - :heavy_check_mark: TD(λ)
   - Q-learning
-    - [x] vanilla q-learning
-    - [ ] $\lambda$ q-learning
+    - :heavy_check_mark: vanilla q-learning
+    - :black_square_button: λ q-learning
 - Simple agents
-  - [X] Tabular + TD,Q (with $\epsilon$-greedy)
-  - [X] Linear + Q (with $\epsilon$-greedy)
+  - :heavy_check_mark: Tabular + TD,Q (with ε-greedy)
+  - :heavy_check_mark: Linear + Q (with ε-greedy)
 - DQN
-  - [ ] Barebones (NN + Q) (:construction: in progress)
-  - [ ] Vanilla DQN
-  - [ ] Rainbow?
+  - :black_square_button: Barebones (NN + Q) (:construction: in progress)
+  - :black_square_button: Vanilla DQN
+  - :black_square_button: Rainbow?
 - Policy Gradient
-  - [ ] Vanilla
-  - [ ] Trust Region/PPO?
+  - :black_square_button: Vanilla
+  - :black_square_button: Trust Region/PPO?
 - Model-based ?
 - GVF ?
 - Combining with Evolutionary ?
