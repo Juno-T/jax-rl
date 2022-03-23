@@ -21,38 +21,39 @@ class MLP_TargetNetwork(hk.Module):
     return self._internal_linear(x)
 
 def get_transformed(*args, **kwargs):
-  assert(type(args[0])==hk.Module)
   return hk.transform(lambda x: args[0](*args[1:], **kwargs)(x))
 
-class Dqn(Agent):
+class BarebonesDqn(Agent):
   """
 
 
   * implementing `step` in `__init__` is inspired by https://github.com/deepmind/dqn_zoo/blob/master/dqn_zoo/dqn/agent.py
   """
-  def __init__(self, env, network : hk.Transformed, epsilon, discount=0.9, learning_rate=0.1, delay_update=10):
+  def __init__(self, env, network : hk.Transformed, epsilon, eps_decay_rate=0.99, discount=0.9, learning_rate=0.1, delay_update=10):
     self.env = env
     self.state_space = env.observation_space
     self.action_space = env.action_space
     self.network_init, self.network_apply = hk.without_apply_rng(network)
     optimizer = optax.adam(learning_rate=learning_rate)
     self.opt_init = optimizer.init
+    self.eps_decay_rate = eps_decay_rate
 
     self.discount=discount
-    self.epsilon = epsilon
+    self.init_epsilon = epsilon
     self.delay_update = delay_update
     self.step_count = 0
     
     @jax.jit
     def batch_value(params, batch_state):
-      return jax.vmap(network.apply, in_axes=(None, 0))(params, x=batch_state)
+      return jax.vmap(network.apply, in_axes=(None, None, 0))(params, None, batch_state)
 
     @jax.jit
     def loss(replay_params, target_params, s_tm1, a_tm1, r_t, s_t):
       q_tm1 = batch_value(replay_params, s_tm1)
       q_t = batch_value(target_params, s_t)
       targets = jax.vmap(q.q_learning, in_axes=(0,0,0,0,None,None))(q_tm1, a_tm1, r_t, q_t, discount, True)
-      return jnp.mean((jax.lax.stop_gradient(targets)-q_tm1)**2/2) # probably not need to stop_gradient since they are different params
+      qa_indices = tuple(jnp.stack((jnp.arange(len(a_tm1)),a_tm1), axis=0))
+      return jnp.mean((jax.lax.stop_gradient(targets)-q_tm1[qa_indices])**2/2) # probably don't need to stop_gradient since they are different params
 
     @jax.jit
     def step(replay_params, target_params, opt_state, s_tm1, a_tm1, r_t, s_t):
@@ -65,10 +66,11 @@ class Dqn(Agent):
     self.step = step
 
   def train_init(self, rng_key):
-    self.target_params = self.network_init(rng=rng_key, x=jnp.zeros((len(self.state_space),)))
-    self.replay_params = self.target_param
-    self.opt_state = self.opt_init(self.replay_param)
+    self.target_params = self.network_init(rng=rng_key, x=jnp.zeros(self.state_space.shape))
+    self.replay_params = self.target_params
+    self.opt_state = self.opt_init(self.replay_params)
     self.step_count = 0
+    self.epsilon = self.init_epsilon
 
 
   def episode_init(self, initial_observation):
@@ -87,21 +89,26 @@ class Dqn(Agent):
     return int(argmax_a), self.discount
 
   def write(self, writer, episode_number):
-    pass
+    writer.add_scalar('train/epsilon', self.epsilon, episode_number)
+    writer.add_scalar('train/loss', self.recent_loss, episode_number)
 
   def learn_batch_transitions(self, transitions):
-    s_tm1 = transitions.s_tm1
+    s_tm1 = self.norm_state(transitions.s_tm1)
     a_tm1 = transitions.a_tm1
     r_t = transitions.r_t
-    s_t = transitions.s_t
+    s_t = self.norm_state(transitions.s_t)
     
-    self.replay_param, self.opt_state, loss =self.step(self.replay_param,
-                                                        self.target_param,
+    self.replay_params, self.opt_state, self.recent_loss =self.step(self.replay_params,
+                                                        self.target_params,
                                                         self.opt_state,
                                                         s_tm1,
                                                         a_tm1,
                                                         r_t,
                                                         s_t)
     self.step_count +=1
+    self.epsilon *= self.eps_decay_rate
     if not self.step_count%self.delay_update:
-      self.target_param=self.replay_param
+      self.target_params=self.replay_params
+
+  def norm_state(self, state):
+    return state/jnp.array([4.8, 10, 0.42, 10]) # Cartpole

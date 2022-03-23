@@ -143,6 +143,9 @@ class Accumulator:
   def len_ep(self):
     return len(self._episodes)
 
+  def len_transitions(self):
+    return self._transitions.size()
+
   def has_new_ep(self):
     if len(self._episodes)>self._prev_ep_len:
       self._prev_ep_len=len(self._episodes)

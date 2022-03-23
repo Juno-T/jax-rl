@@ -24,6 +24,8 @@ class Trainer:
     self.writer = SummaryWriter(logdir)
     self.trained_ep = 0
     
+  def _reset(self):
+    pass #TODO
 
   def train(self, 
     rngkey, 
@@ -37,6 +39,7 @@ class Trainer:
 
     rngkey, init_rngkey = random.split(rngkey)
     if not is_continue:
+      self._reset()
       self.trained_ep=0
       agent.train_init(init_rngkey)
     for episode_number in tqdm(range(self.trained_ep, self.trained_ep+train_episodes), bar_format='{l_bar}{bar:15}{r_bar}{bar:-15b}'):

@@ -66,21 +66,14 @@ class epsLinearAgent(Agent):
     - bootstrap               (in q_learning)
     - off policy              (q_learning use greedy policy)
     - function approximation  (linear)
-
-  Hyperparameters for Cartpole-v1:
-    eps = 1
-    eps_decay_rate=1-1e-2
-    learning_rate=0.1
-    lr_decay=0.97
-    init weight with random uniform times 1e-3
   """
-  def __init__(self, env, epsilon, eps_decay_rate=None, learning_rate=0.1, lr_decay=1):
+  def __init__(self, env, epsilon, eps_decay_rate=0.99, learning_rate=0.1, lr_decay=1):
     self.env = env
     self.state_space = env.observation_space
     self.action_space = env.action_space
     if hasattr(self.state_space, 'high'):
       # self.state_max = self.state_space.high
-      self.state_max = jnp.array([4.8, 10, 0.42, 10])
+      self.state_max = jnp.array([4.8, 10, 0.42, 10]) # Cartpole
     else:
       self.state_max = jnp.array([sp.n-1 for sp in self.state_space])
     self.appr = LinearApproximator(len(self.state_max), self.action_space.n)
@@ -133,13 +126,6 @@ class epsLinearAgent(Agent):
     targets = jax.vmap(q.q_learning_target, in_axes=[0,0,None])(r_t, q_t, self.discount)
     grad, loss = LinearApproximator.batched_weight_update(self.appr.W, s_tm1, a_tm1, targets)
     self.recent_loss = loss
-    # grads, losses = [], []
-    # for i in range(len(s_tm1)):
-    #   grad, loss = LinearApproximator.manual_weight_gradient(self.appr.W, s_tm1[i], a_tm1[i], targets[i])
-    #   losses.append(loss)
-    #   grads.append(grad)
-    # grad = jnp.sum(jnp.array(grads), axis=0)
-    # self.recent_loss = jnp.mean(jnp.array(losses))
     assert(grad.shape ==  self.appr.W.shape)
     self.appr.assign_W(self.appr.W - self.lr*grad)
     self.opt_step()
