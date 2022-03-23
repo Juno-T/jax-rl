@@ -51,13 +51,12 @@ class BarebonesDqn(Agent):
     def loss(replay_params, target_params, s_tm1, a_tm1, r_t, s_t):
       q_tm1 = batch_value(replay_params, s_tm1)
       q_t = batch_value(target_params, s_t)
-      targets = jax.vmap(q.q_learning, in_axes=(0,0,0,0,None,None))(q_tm1, a_tm1, r_t, q_t, discount, True)
-      qa_indices = tuple(jnp.stack((jnp.arange(len(a_tm1)),a_tm1), axis=0))
-      return jnp.mean((jax.lax.stop_gradient(targets)-q_tm1[qa_indices])**2/2) # probably don't need to stop_gradient since they are different params
+      errors = jax.vmap(q.q_learning, in_axes=(0,0,0,0,None,None))(q_tm1, a_tm1, r_t, q_t, discount, True)
+      return jnp.mean(errors**2/2)
 
     @jax.jit
     def step(replay_params, target_params, opt_state, s_tm1, a_tm1, r_t, s_t):
-      loss_value, grads = jax.value_and_grad(loss, argnums=1)(replay_params, target_params, s_tm1, a_tm1, r_t, s_t)
+      loss_value, grads = jax.value_and_grad(loss)(replay_params, target_params, s_tm1, a_tm1, r_t, s_t)
       updates, opt_state = optimizer.update(grads, opt_state, replay_params)
       replay_params = optax.apply_updates(replay_params, updates)
       return replay_params, opt_state, loss_value
