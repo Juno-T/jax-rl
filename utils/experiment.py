@@ -18,11 +18,13 @@ class Trainer:
     Interaction between agent and environment
   """
 
-  def __init__(self, env, accumulator:Accumulator, logdir):
+  def __init__(self, env, accumulator:Accumulator, logdir, onEpisodeSummary = lambda step, data: None):
     self.env = env
     self.acc = accumulator
+    # TODO: clean legacy tensorboard logger
     self.writer = SummaryWriter(logdir)
     self.trained_ep = 0
+    self.onEpisodeSummary = onEpisodeSummary
     
   def _reset(self):
     pass #TODO
@@ -42,10 +44,13 @@ class Trainer:
       self._reset()
       self.trained_ep=0
       agent.train_init(init_rngkey)
-    for episode_number in tqdm(range(self.trained_ep, self.trained_ep+train_episodes), bar_format='{l_bar}{bar:15}{r_bar}{bar:-15b}'):
-      rngkey, act_root_rngkey, sample_rngkey, eval_rngkey = random.split(rngkey, 4)
 
-      observation = jnp.array(self.env.reset())
+    for episode_number in tqdm(range(self.trained_ep, self.trained_ep+train_episodes), bar_format='{l_bar}{bar:15}{r_bar}{bar:-15b}'):
+      rngkey, env_rngkey, act_root_rngkey, sample_rngkey, eval_rngkey = random.split(rngkey, 5)
+      episode_summary = {'train': {}, 'val':{}, 'agent': {}}
+
+
+      observation = jnp.array(self.env.reset(seed=int(random.randint(env_rngkey, (), 0, 1e5))))
       self.acc.push(None, TimeStep(obsv = observation))
       done=False
       agent.episode_init(observation)
@@ -62,7 +67,9 @@ class Trainer:
       
       episode = self.acc.sample_one_ep(last_episode=True)
       a_tm1, timesteps = episode
-      self.writer.add_scalar('train/reward', jnp.sum(timesteps.reward).item(), episode_number)
+      train_reward = jnp.sum(timesteps.reward).item()
+      episode_summary['train']['reward']=train_reward
+      self.writer.add_scalar('train/reward', train_reward, episode_number)
 
       if learn_from_transitions:
         transitions = self.acc.sample_batch_transtions(sample_rngkey, batch_size)
@@ -71,8 +78,12 @@ class Trainer:
         agent.learn_one_ep(episode)
       
       if episode_number%evaluate_every==0:
-        self.eval(eval_rngkey, agent, eval_episodes, episode_number)
+        test_reward = self.eval(eval_rngkey, agent, eval_episodes, episode_number)
+        episode_summary['val']['reward'] = test_reward
+      episode_summary['agent']=agent.get_stats()
       agent.write(self.writer, episode_number)
+
+      self.onEpisodeSummary(episode_number, episode_summary)
     self.trained_ep += train_episodes
       
 
@@ -91,4 +102,6 @@ class Trainer:
         rewards.append(reward)
     rewards = jnp.array(rewards)
     # todo: plot with policy entropy/ explained variance (PPO)
-    self.writer.add_scalar('eval/reward',jnp.sum(rewards).item(),episode_number)
+    test_reward = jnp.sum(rewards).item()
+    self.writer.add_scalar('eval/reward', test_reward,episode_number)
+    return test_reward

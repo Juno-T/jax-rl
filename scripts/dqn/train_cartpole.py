@@ -1,0 +1,48 @@
+import gym
+from jax import random
+import sys
+import wandb
+
+sys.path.append('/home/juno/work/playground/jax-rl')
+from utils import experience, experiment
+from value_prediction import approximator
+from agents.dqn import MLP_TargetNetwork, get_transformed
+from agents import *
+
+def onEpisodeSummary(step, data):
+  wandb.log(data=data, step=step)
+
+def main():
+  config = {
+    'eps_decay_rate':1-3e-3, 
+    'learning_rate': .01,
+    'delay_update':100
+  }
+  wandb.init(
+    entity="yossathorn-t",
+    project="jax-rl_dqn",
+    notes="Test barebones dqn on gym's cartpole",
+    tags=["dqn", "barebones", "cartpole"],
+    config=config  
+  )
+
+  key = random.PRNGKey(42)
+  env = gym.make('CartPole-v1')
+  tn = get_transformed(MLP_TargetNetwork, output_sizes= [10, env.action_space.n]) # MLP [4, 10, 2]
+  epsilon = 1
+  agent = BarebonesDqn(env, 
+                      tn, 
+                      epsilon, 
+                      eps_decay_rate=config['eps_decay_rate'], 
+                      learning_rate=config['learning_rate'],
+                      delay_update=config['delay_update'])
+  acc = experience.Accumulator(501,3,10000)
+  trainer = experiment.Trainer(env, acc, './log/dqn/barebones/exp16_4_10_2', onEpisodeSummary=onEpisodeSummary)
+
+  train_episodes = 1000
+  key, train_key = random.split(key)
+  trainer.train(train_key, agent, train_episodes, batch_size=100, is_continue=False, learn_from_transitions=True)
+
+
+if __name__=='__main__':
+  main()

@@ -29,6 +29,9 @@ class Agent(ABC):
   def write(self, writer, episode_number):
     raise("Not implemented")
 
+  def get_stats(self):
+    raise("Not implemented")
+
   def learn_one_ep(self, episode):
     raise("Not implemented")
 

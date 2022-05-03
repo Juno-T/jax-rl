@@ -91,6 +91,12 @@ class BarebonesDqn(Agent):
     writer.add_scalar('train/epsilon', self.epsilon, episode_number)
     writer.add_scalar('train/loss', self.recent_loss, episode_number)
 
+  def get_stats(self):
+    return {
+      'epsilon': self.epsilon,
+      'loss': self.recent_loss
+    }
+
   def learn_batch_transitions(self, transitions):
     s_tm1 = self.norm_state(transitions.s_tm1)
     a_tm1 = transitions.a_tm1
