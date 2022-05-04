@@ -76,10 +76,12 @@ class BarebonesDqn(Agent):
     pass
 
   def act(self, observation, rngkey):
+    rngkey, rand_action_key = random.split(rngkey, 2)
     q_t = self.network_apply(self.replay_params, x=observation)
     argmax_a = jnp.argmax(q_t)
     rn = random.uniform(rngkey)
-    action = int( (rn<self.epsilon)* self.action_space.sample() + (rn>=self.epsilon)*argmax_a)
+    rand_action = random.randint(rand_action_key, (), 0, len(q_t))
+    action = int( (rn<self.epsilon)* rand_action + (rn>=self.epsilon)*argmax_a)
     return action, self.discount
 
   def eval_act(self, observation, rngkey=None):

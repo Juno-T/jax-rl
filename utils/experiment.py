@@ -89,8 +89,8 @@ class Trainer:
 
   def eval(self, rngkey, agent, eval_episodes, episode_number):
     for ep in range(eval_episodes):
-      rngkey, act_root_rngkey = random.split(rngkey)
-      observation = jnp.array(self.env.reset())
+      rngkey, env_rngkey, act_root_rngkey = random.split(rngkey, 3)
+      observation = jnp.array(self.env.reset(seed=int(random.randint(env_rngkey, (), 0, 1e5))))
       # self.acc.push(None, TimeStep(obsv = observation))
       done=False
       agent.episode_init(observation)
