@@ -1,9 +1,11 @@
 import gym
 from jax import random
 import sys
+import os
+from pathlib import Path
 import wandb
 
-sys.path.append('/home/juno/work/playground/jax-rl')
+sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
 from utils import experience, experiment
 from value_prediction import approximator
 from agents.dqn import MLP_TargetNetwork, get_transformed
@@ -37,7 +39,7 @@ def main():
                       learning_rate=config['learning_rate'],
                       delay_update=config['delay_update'])
   acc = experience.Accumulator(501,3,10000)
-  trainer = experiment.Trainer(env, acc, './log/dqn/barebones/exp16_4_10_2', onEpisodeSummary=onEpisodeSummary)
+  trainer = experiment.Trainer(env, acc, './log/dqn/barebones/exp0_4_10_2', onEpisodeSummary=onEpisodeSummary)
 
   train_episodes = 1000
   key, train_key = random.split(key)
