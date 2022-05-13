@@ -132,8 +132,3 @@ class epsLinearAgent(Agent):
 
   def norm_state(self, state):
     return state/self.state_max
-
-
-  def write(self, writer, episode_number):
-    writer.add_scalar('train/epsilon', self.epsilon, episode_number)
-    writer.add_scalar('train/loss', self.recent_loss, episode_number)

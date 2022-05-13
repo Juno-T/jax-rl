@@ -17,8 +17,8 @@ def onEpisodeSummary(step, data):
 def main():
   config = {
     'eps_decay_rate':1-3e-3, 
-    'learning_rate': .01,
-    'delay_update':100
+    'learning_rate': 1e-2,
+    'delay_update': 200
   }
   wandb.init(
     entity="yossathorn-t",
@@ -39,7 +39,7 @@ def main():
                       learning_rate=config['learning_rate'],
                       delay_update=config['delay_update'])
   acc = experience.Accumulator(501,3,10000)
-  trainer = experiment.Trainer(env, acc, './log/dqn/barebones/exp0_4_10_2', onEpisodeSummary=onEpisodeSummary)
+  trainer = experiment.Trainer(env, acc, onEpisodeSummary=onEpisodeSummary)
 
   train_episodes = 1000
   key, train_key = random.split(key)

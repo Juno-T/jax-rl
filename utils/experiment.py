@@ -6,7 +6,6 @@ import jax
 from jax import random
 import jax.numpy as jnp
 from tqdm import tqdm
-from tensorboardX import SummaryWriter
 
 from utils.experience import TimeStep, Accumulator
 from agents import Agent
@@ -18,11 +17,9 @@ class Trainer:
     Interaction between agent and environment
   """
 
-  def __init__(self, env, accumulator:Accumulator, logdir, onEpisodeSummary = lambda step, data: None):
+  def __init__(self, env, accumulator:Accumulator, onEpisodeSummary = lambda step, data: None):
     self.env = env
     self.acc = accumulator
-    # TODO: clean legacy tensorboard logger
-    self.writer = SummaryWriter(logdir)
     self.trained_ep = 0
     self.onEpisodeSummary = onEpisodeSummary
     
@@ -69,7 +66,6 @@ class Trainer:
       a_tm1, timesteps = episode
       train_reward = jnp.sum(timesteps.reward).item()
       episode_summary['train']['reward']=train_reward
-      self.writer.add_scalar('train/reward', train_reward, episode_number)
 
       if learn_from_transitions:
         transitions = self.acc.sample_batch_transtions(sample_rngkey, batch_size)
@@ -81,7 +77,6 @@ class Trainer:
         test_reward = self.eval(eval_rngkey, agent, eval_episodes, episode_number)
         episode_summary['val']['reward'] = test_reward
       episode_summary['agent']=agent.get_stats()
-      agent.write(self.writer, episode_number)
 
       self.onEpisodeSummary(episode_number, episode_summary)
     self.trained_ep += train_episodes
@@ -103,5 +98,4 @@ class Trainer:
     rewards = jnp.array(rewards)
     # todo: plot with policy entropy/ explained variance (PPO)
     test_reward = jnp.sum(rewards).item()
-    self.writer.add_scalar('eval/reward', test_reward,episode_number)
     return test_reward

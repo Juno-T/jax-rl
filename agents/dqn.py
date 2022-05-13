@@ -95,10 +95,6 @@ class BarebonesDqn(Agent):
     action = self.select_action(observation, self.replay_params, 0.0, random.PRNGKey(0))
     return int(action), self.discount
 
-  def write(self, writer, episode_number):
-    writer.add_scalar('train/epsilon', self.epsilon, episode_number)
-    writer.add_scalar('train/loss', self.recent_loss, episode_number)
-
   def get_stats(self):
     return {
       'epsilon': self.epsilon,

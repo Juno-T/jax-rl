@@ -26,9 +26,6 @@ class Agent(ABC):
   def eval_act(self, observation, rngkey=None):
     return self.act(observation, rngkey)
 
-  def write(self, writer, episode_number):
-    raise("Not implemented")
-
   def get_stats(self):
     raise("Not implemented")
 
