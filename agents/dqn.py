@@ -33,7 +33,7 @@ class BarebonesDqn(Agent):
     self.env = env
     self.state_space = env.observation_space
     self.action_space = env.action_space
-    self.network_init, self.network_apply = hk.without_apply_rng(network)
+    self.network_init, network_apply = hk.without_apply_rng(network)
     optimizer = optax.adam(learning_rate=learning_rate)
     self.opt_init = optimizer.init
     self.eps_decay_rate = eps_decay_rate
@@ -64,6 +64,18 @@ class BarebonesDqn(Agent):
     self.batch_value = batch_value
     self.step = step
 
+    @jax.jit
+    def select_action(observation, network_params, epsilon, rngkey):
+      rngkey, rand_action_key = random.split(rngkey, 2)
+      q_t = network_apply(network_params, x=observation)
+      argmax_a = jnp.argmax(q_t)
+      rn = random.uniform(rngkey)
+      rand_action = random.randint(rand_action_key, (), 0, len(q_t))
+      action = (rn<epsilon)* rand_action + (rn>=epsilon)*argmax_a
+      return action
+    
+    self.select_action = select_action
+
   def train_init(self, rng_key):
     self.target_params = self.network_init(rng=rng_key, x=jnp.zeros(self.state_space.shape))
     self.replay_params = self.target_params
@@ -76,18 +88,12 @@ class BarebonesDqn(Agent):
     pass
 
   def act(self, observation, rngkey):
-    rngkey, rand_action_key = random.split(rngkey, 2)
-    q_t = self.network_apply(self.replay_params, x=observation)
-    argmax_a = jnp.argmax(q_t)
-    rn = random.uniform(rngkey)
-    rand_action = random.randint(rand_action_key, (), 0, len(q_t))
-    action = int( (rn<self.epsilon)* rand_action + (rn>=self.epsilon)*argmax_a)
-    return action, self.discount
+    action = self.select_action(observation, self.replay_params, self.epsilon, rngkey)
+    return int(action), self.discount
 
   def eval_act(self, observation, rngkey=None):
-    q_t = self.network_apply(self.replay_params, x=observation)
-    argmax_a = jnp.argmax(q_t)
-    return int(argmax_a), self.discount
+    action = self.select_action(observation, self.replay_params, 0.0, random.PRNGKey(0))
+    return int(action), self.discount
 
   def write(self, writer, episode_number):
     writer.add_scalar('train/epsilon', self.epsilon, episode_number)
