@@ -4,13 +4,16 @@ import os
 from pathlib import Path
 
 import jax
+import haiku as hk
+import jax.numpy as jnp
+import jax
 import gym
 import numpy as np
 
 sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent))
 from utils import experience, experiment
 from value_prediction import approximator
-from agents.dqn import MLP_TargetNetwork, get_transformed
+from agents.dqn import MLP_TargetNetwork, DQN_CNN, get_transformed
 from agents import *
 
 class TestReproducibility(unittest.TestCase):
@@ -77,7 +80,16 @@ class TestReproducibility(unittest.TestCase):
       self.assertEqual(action1, action2)
       observation, reward, done, info = self.env.step(action1)
     
-    
+class TestGeneral(unittest.TestCase):
+  def test_network_call(self):
+    out_size = 10
+    batch_size = 14
+    key = random.PRNGKey(42)
+    init, apply = hk.transform(lambda x: DQN_CNN(out_size)(x))
+    params = init(rng = key, x=jax.random.normal(key, (4,84,84)))
+    sample_x = jax.random.normal(key, (batch_size, 4, 84, 84))
+    out = apply(params=params, x=sample_x, rng=key)
+    self.assertTrue(out.shape==(batch_size, out_size))
 
 
 if __name__ == '__main__':

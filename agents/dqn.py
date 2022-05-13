@@ -20,6 +20,22 @@ class MLP_TargetNetwork(hk.Module):
   def __call__(self, x):
     return self._internal_linear(x)
 
+class DQN_CNN(hk.Module):
+  def __init__(self, output_size, name='DQN_CNN'):
+    super().__init__(name=name)
+    self._conv1 = hk.Conv2D(16, (8,8), stride=4)
+    self._conv2 = hk.Conv2D(32, (4,4), stride=2)
+    self._mlp=hk.nets.MLP((32*9*9, 256, output_size))
+    self.flat = hk.Flatten()
+
+  def __call__(self, x):
+    x = self._conv1(x)
+    x = jax.nn.relu(x)
+    x = self._conv2(x)
+    x = jax.nn.relu(x)
+    return self._mlp(self.flat(x))
+
+
 def get_transformed(*args, **kwargs):
   return hk.transform(lambda x: args[0](*args[1:], **kwargs)(x))
 
