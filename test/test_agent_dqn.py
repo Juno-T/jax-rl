@@ -2,8 +2,9 @@ import unittest
 import sys
 import os
 from pathlib import Path
-import gym
+
 import jax
+import gym
 import numpy as np
 
 sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent))

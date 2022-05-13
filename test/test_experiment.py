@@ -2,14 +2,14 @@ import unittest
 import sys
 import os
 from pathlib import Path
+
+import jax.numpy as jnp
 import gym
+import numpy as np
 import stable_baselines3 as sb3
 
 sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent))
 from utils import experience, experiment
-from value_prediction import approximator
-from agents.dqn import MLP_TargetNetwork, get_transformed
-from agents import *
 
 class TestReproducibility(unittest.TestCase):
 
