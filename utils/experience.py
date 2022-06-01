@@ -29,9 +29,8 @@ class NP_deque():
     self.maxlen = maxlen
     self.reset()
 
-
-  def reset(self):
-    self._storage = np.array([None]*self.maxlen, dtype=object)
+  def reset(self, element=None):
+    self._storage = np.array([element]*self.maxlen, dtype=object)
     self._head = -1
 
   def add(self, element):
@@ -48,11 +47,16 @@ class NP_deque():
 
   def get_random_batch(self, rng_key, batch_size):
     assert(self._head+1>0)
-    indices = np.asarray(random.randint(rng_key, (batch_size,), 0, self.size()))
+    indices = np.asarray(random.randint(rng_key, (batch_size,), 0, self.size))
     return self._storage[indices]
 
+  def get_all_ordered(self):
+    return np.roll(self._storage, -(self._head+1), axis=0)
+
+  @property
   def size(self):
     return min(self._head+1, self.maxlen)
+
 
 # Modified from Deepmind/rlax example
 class Accumulator:
@@ -71,15 +75,20 @@ class Accumulator:
       _new_episode
       push
       sample_one_ep
-      len_ep
       has_new_ep
+
+    Property
+      len_ep
+      len_transition
 
 
   """
 
-  def __init__(self, max_t, max_ep, max_transition):
+  def __init__(self, max_t, max_ep, max_transition, look_back = 1):
     self._episodes = collections.deque(maxlen=max_ep)
     self._transitions = NP_deque(maxlen=max_transition)
+    self._look_back_obsv = NP_deque(maxlen=look_back)
+    self._look_back = look_back
     self._max_t = max_t
     self._last_timestep = None
     self._prev_ep_len = 0
@@ -88,12 +97,28 @@ class Accumulator:
 
   def _new_episode(self):
     self._timesteps = collections.deque(maxlen = self._max_t)
+    self._look_back_obsv.reset()
+
+  def _process_look_back(self, timestep_t):
+    if self._look_back == 1: # will not add dim size 1
+      return self._last_timestep.obsv, timestep_t.obsv
+
+    # lookback>1
+    if self._look_back_obsv.size==0: # pad with zeros
+      self._look_back_obsv.reset(element = jnp.zeros_like(timestep_t.obsv))
+      self._look_back_obsv.add(self._last_timestep.obsv)
+        
+    s_tm1 = self._look_back_obsv.get_all_ordered()
+    self._look_back_obsv.add(timestep_t.obsv)
+    s_t = self._look_back_obsv.get_all_ordered()
+    return s_tm1, s_t
 
   def _add_transition(self, a_tm1, timestep_t):
+    s_tm1, s_t = self._process_look_back(timestep_t)
     self._transitions.add(Transition(
-      s_tm1=self._last_timestep.obsv,
+      s_tm1 = s_tm1,
       a_tm1 = a_tm1,
-      s_t = timestep_t.obsv,
+      s_t = s_t,
       r_t = timestep_t.reward
     ))
 
@@ -140,11 +165,13 @@ class Accumulator:
     return jax.tree_multimap(lambda *ts: np.stack(ts),
                               *self._transitions.get_random_batch(rng_key, batch_size))
 
+  @property
   def len_ep(self):
     return len(self._episodes)
 
+  @property
   def len_transitions(self):
-    return self._transitions.size()
+    return self._transitions.size
 
   def has_new_ep(self):
     if len(self._episodes)>self._prev_ep_len:
