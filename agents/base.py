@@ -52,7 +52,7 @@ class RandomAgent(Agent):
 
   def act(self, observation, rngkey):
     rand_action = random.randint(rngkey, (), 0, self.action_space.n)
-    return self.action_space.sample(), self.discount
+    return rand_action, self.discount
 
   # @partial(jax.jit, static_argnums=(0,))
   def learn_one_ep(self, episode):
