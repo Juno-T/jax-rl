@@ -46,13 +46,14 @@ class TestFunctionality(unittest.TestCase):
     max_transition = 1000
     self.look_back = 4
     self.acc = experience.Accumulator(max_t, max_ep, max_transition, look_back = self.look_back)
+    self.acc_temp = experience.Accumulator(max_t, max_ep, max_transition, look_back = self.look_back)
     self.no_lb_acc = experience.Accumulator(max_t, max_ep, max_transition, look_back = 1)
     return super().setUp()
 
   def test_init(self):
-    assert(self.acc.len_ep==0)
-    assert(self.acc.len_transitions==0)
-    assert(self.acc._look_back_obsv.size==0)
+    self.assertTrue(self.acc.len_ep==0)
+    self.assertTrue(self.acc.len_transitions==0)
+    self.assertTrue(self.acc._look_back_obsv.size==0)
 
   def test_run_rand(self):
     num_trial = 20
@@ -62,7 +63,7 @@ class TestFunctionality(unittest.TestCase):
       self.acc.push(*random_transition(rng_key))
       self.no_lb_acc.push(*random_transition(rng_key))
     batch_ts = self.acc.sample_batch_transtions(rng_key, batch_size)
-    assert(batch_ts.s_tm1.shape==(batch_size, self.look_back, 2, 3))
+    self.assertTrue(batch_ts.s_tm1.shape==(batch_size, self.look_back, 2, 3))
 
   def test_run_det0(self):
     pass
@@ -72,13 +73,32 @@ class TestFunctionality(unittest.TestCase):
     for i in range(num_trial):
       self.acc.push(*transition_i(i))
     self.acc.push(*transition_i(num_trial, termination=True))
-    assert(1==1)
-    assert(self.acc.len_ep==1)
-    assert(self.acc.len_transitions==num_trial)
-    assert(self.acc._transitions.at(0).s_tm1.shape == (self.look_back, 2, 3))
-    assert(self.acc._transitions.at(0).s_t.shape == (self.look_back, 2, 3))
-    assert(sum([np.sum(v) for v in self.acc._transitions.at(0).s_tm1])==0)
-    assert(sum([np.sum(v) for v in self.acc._transitions.at(0).s_t])==6)
+    self.assertTrue(self.acc.len_ep==1)
+    self.assertTrue(self.acc.len_transitions==num_trial)
+    self.assertTrue(self.acc._transitions.at(0).s_tm1.shape == (self.look_back, 2, 3))
+    self.assertTrue(self.acc._transitions.at(0).s_t.shape == (self.look_back, 2, 3))
+    self.assertTrue(sum([np.sum(v) for v in self.acc._transitions.at(0).s_tm1])==0)
+    self.assertTrue(sum([np.sum(v) for v in self.acc._transitions.at(0).s_t])==6)
+
+  def test_reproducibility(self):
+    num_trial = 20
+    batch_size = 2
+    key, rng_key = random.split(TestFunctionality.key)
+    for _ in range(num_trial):
+      key, rng_key = random.split(key)
+      arg = random_transition(rng_key)
+      self.acc.push(*arg)
+      self.acc_temp.push(*arg)
+    for _ in range(5):
+      key, rng_key = random.split(key)
+      bt1 = self.acc.sample_batch_transtions(rng_key, batch_size)
+      bt2 = self.acc_temp.sample_batch_transtions(rng_key, batch_size)
+      ac1, ep1 = self.acc.sample_one_ep(rng_key = rng_key)
+      ac2, ep2 = self.acc_temp.sample_one_ep(rng_key = rng_key)
+      for v in zip([bt1.s_tm1,ac1,ep1.obsv],[bt2.s_tm1,ac2,ep2.obsv]):
+        self.assertTrue(v[0].shape==v[1].shape)
+        self.assertTrue(all(jnp.ravel(jnp.equal(jnp.array(v[0].astype(np.float32)), jnp.array(v[1].astype(np.float32))))))
+
 
     
     
