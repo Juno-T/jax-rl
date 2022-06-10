@@ -100,25 +100,18 @@ class Accumulator:
     self._look_back_obsv.reset()
 
   def _process_look_back(self, timestep_t):
-    if self._look_back == 1: # will not add dim size 1
-      return self._last_timestep.obsv, timestep_t.obsv
-
-    # lookback>1
-    if self._look_back_obsv.size==0: # pad with zeros
+    if self._last_timestep is None:
       self._look_back_obsv.reset(element = jnp.zeros_like(timestep_t.obsv))
-      self._look_back_obsv.add(self._last_timestep.obsv)
-        
-    s_tm1 = self._look_back_obsv.get_all_ordered()
+    
     self._look_back_obsv.add(timestep_t.obsv)
-    s_t = self._look_back_obsv.get_all_ordered()
-    return s_tm1, s_t
+    timestep_t = timestep_t._replace(obsv=self.processed_observation)
+    return timestep_t
 
   def _add_transition(self, a_tm1, timestep_t):
-    s_tm1, s_t = self._process_look_back(timestep_t)
     self._transitions.add(Transition(
-      s_tm1 = s_tm1,
+      s_tm1 = self._last_timestep.obsv,
       a_tm1 = a_tm1,
-      s_t = s_t,
+      s_t = timestep_t.obsv,
       r_t = timestep_t.reward
     ))
 
@@ -132,8 +125,11 @@ class Accumulator:
     )
     self._timesteps.append((a_tm1, timestep_t))
 
+
+    timestep_t = self._process_look_back(timestep_t)
     if self._last_timestep is not None:
       self._add_transition(a_tm1, timestep_t)
+
     self._last_timestep = timestep_t
 
     if timestep_t.step_type: # terminal
@@ -164,6 +160,16 @@ class Accumulator:
   def sample_batch_transtions(self, rng_key, batch_size):
     return jax.tree_multimap(lambda *ts: np.stack(ts),
                               *self._transitions.get_random_batch(rng_key, batch_size))
+
+  @property
+  def processed_observation(self):
+    """
+      Get the processed observation which refer to the combined lookbacks observations.
+      The number dimension is equal to the observation, squashing the lookback dim to the last dim of obsv.
+    """
+    p_obsv = self._look_back_obsv.get_all_ordered()
+    p_obsv = np.moveaxis(p_obsv, 0, -1)
+    return jnp.array(p_obsv.reshape((*p_obsv.shape[:-2], -1)), dtype=jnp.float32) # combine first two dims
 
   @property
   def len_ep(self):

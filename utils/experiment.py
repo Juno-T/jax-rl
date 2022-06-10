@@ -1,5 +1,6 @@
 import collections
 from typing import NamedTuple, Any
+from copy import deepcopy
 
 import numpy as np
 import jax
@@ -20,6 +21,7 @@ class Trainer:
   def __init__(self, env, accumulator:Accumulator, onEpisodeSummary = lambda step, data: None):
     self.env = env
     self.acc = accumulator
+    self.eval_acc = deepcopy(accumulator)
     self.trained_ep = 0
     self.onEpisodeSummary = onEpisodeSummary
     
@@ -36,7 +38,7 @@ class Trainer:
     is_continue: bool=False, 
     learn_from_transitions: bool=False):
 
-    rngkey, init_rngkey = random.split(rngkey)
+    rngkey, init_rngkey = random.split(rngkey)  
     if not is_continue:
       self._reset()
       self.trained_ep=0
@@ -46,18 +48,21 @@ class Trainer:
       rngkey, env_rngkey, act_root_rngkey, sample_rngkey, eval_rngkey = random.split(rngkey, 5)
       episode_summary = {'train': {}, 'val':{}, 'agent': {}}
 
+      observation = jnp.array(self.env.reset(seed=int(random.randint(env_rngkey, (), 0, 1e5))), 
+                              dtype=jnp.float32)
 
-      observation = jnp.array(self.env.reset(seed=int(random.randint(env_rngkey, (), 0, 1e5))))
       self.acc.push(None, TimeStep(obsv = observation))
       done=False
       agent.episode_init(observation)
       while not done:
         act_root_rngkey, act_rngkey = random.split(act_root_rngkey)
-        action, discount = agent.act(observation, act_rngkey)
+        print(self.acc.processed_observation.shape)
+        action, discount = agent.act(self.acc.processed_observation, act_rngkey)
+        # print(action)
         observation, reward, done, info = self.env.step(action)
         self.acc.push(action, TimeStep(
             int(done),
-            jnp.array(observation),
+            jnp.array(observation, dtype=jnp.float32),
             reward,
             discount
         ))
@@ -85,15 +90,23 @@ class Trainer:
   def eval(self, rngkey, agent, eval_episodes, episode_number):
     for ep in range(eval_episodes):
       rngkey, env_rngkey, act_root_rngkey = random.split(rngkey, 3)
-      observation = jnp.array(self.env.reset(seed=int(random.randint(env_rngkey, (), 0, 1e5))))
-      # self.acc.push(None, TimeStep(obsv = observation))
+      observation = jnp.array(self.env.reset(seed=int(random.randint(env_rngkey, (), 0, 1e5))),
+                              dtype=jnp.float32)
+
+      self.eval_acc.push(None, TimeStep(obsv = observation))
       done=False
       agent.episode_init(observation)
       rewards = []
       while not done:
         act_root_rngkey, act_rngkey = random.split(act_root_rngkey)
-        action, discount = agent.eval_act(observation, act_rngkey)
+        action, discount = agent.eval_act(self.eval_acc.processed_observation, act_rngkey)
         observation, reward, done, info = self.env.step(action)
+        self.eval_acc.push(action, TimeStep(
+            int(done),
+            jnp.array(observation, dtype=jnp.float32),
+            reward,
+            discount
+        ))
         rewards.append(reward)
     rewards = jnp.array(rewards)
     # todo: plot with policy entropy/ explained variance (PPO)

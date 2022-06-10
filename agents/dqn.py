@@ -45,7 +45,7 @@ class BarebonesDqn(Agent):
 
   * implementing `step` in `__init__` is inspired by https://github.com/deepmind/dqn_zoo/blob/master/dqn_zoo/dqn/agent.py
   """
-  def __init__(self, env, network : hk.Transformed, epsilon, eps_decay_rate=0.99, discount=0.9, learning_rate=0.1, delay_update=10):
+  def __init__(self, env, network : hk.Transformed, epsilon, look_back=1, eps_decay_rate=0.99, discount=0.9, learning_rate=0.1, delay_update=10):
     self.env = env
     self.state_space = env.observation_space
     self.action_space = env.action_space
@@ -58,6 +58,7 @@ class BarebonesDqn(Agent):
     self.init_epsilon = epsilon
     self.delay_update = delay_update
     self.step_count = 0
+    self.look_back = look_back
     
     @jax.jit
     def batch_value(params, batch_state):
@@ -83,17 +84,20 @@ class BarebonesDqn(Agent):
     @jax.jit
     def select_action(observation, network_params, epsilon, rngkey):
       rngkey, rand_action_key = random.split(rngkey, 2)
-      q_t = network_apply(network_params, x=observation)
+      q_t = network_apply(network_params, x=jnp.expand_dims(observation,0))
       argmax_a = jnp.argmax(q_t)
       rn = random.uniform(rngkey)
       rand_action = random.randint(rand_action_key, (), 0, len(q_t))
-      action = (rn<epsilon)* rand_action + (rn>=epsilon)*argmax_a
+      # action = jax.lax.cond(rn<epsilon, lambda: rand_action, lambda:argmax_a)
+      action = argmax_a
       return action
     
     self.select_action = select_action
 
   def train_init(self, rng_key):
-    self.target_params = self.network_init(rng=rng_key, x=jnp.zeros(self.state_space.shape))
+    processed_observation_shape = ( *self.state_space.shape[:-1], self.state_space.shape[-1]*self.look_back)
+    print(processed_observation_shape)
+    self.target_params = self.network_init(rng=rng_key, x=jnp.zeros(processed_observation_shape))
     self.replay_params = self.target_params
     self.opt_state = self.opt_init(self.replay_params)
     self.step_count = 0

@@ -63,7 +63,7 @@ class TestFunctionality(unittest.TestCase):
       self.acc.push(*random_transition(rng_key))
       self.no_lb_acc.push(*random_transition(rng_key))
     batch_ts = self.acc.sample_batch_transtions(rng_key, batch_size)
-    self.assertTrue(batch_ts.s_tm1.shape==(batch_size, self.look_back, 2, 3))
+    self.assertTrue(batch_ts.s_tm1.shape==(batch_size, 2, self.look_back*3))
 
   def test_run_det0(self):
     pass
@@ -75,8 +75,8 @@ class TestFunctionality(unittest.TestCase):
     self.acc.push(*transition_i(num_trial, termination=True))
     self.assertTrue(self.acc.len_ep==1)
     self.assertTrue(self.acc.len_transitions==num_trial)
-    self.assertTrue(self.acc._transitions.at(0).s_tm1.shape == (self.look_back, 2, 3))
-    self.assertTrue(self.acc._transitions.at(0).s_t.shape == (self.look_back, 2, 3))
+    self.assertTrue(self.acc._transitions.at(0).s_tm1.shape == (2, self.look_back*3))
+    self.assertTrue(self.acc._transitions.at(0).s_t.shape == (2, self.look_back*3))
     self.assertTrue(sum([np.sum(v) for v in self.acc._transitions.at(0).s_tm1])==0)
     self.assertTrue(sum([np.sum(v) for v in self.acc._transitions.at(0).s_t])==6)
 

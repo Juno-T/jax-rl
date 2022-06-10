@@ -1,4 +1,5 @@
 import gym
+import stable_baselines3 as sb3
 from jax import random
 import sys
 import os
@@ -6,7 +7,7 @@ from pathlib import Path
 # import wandb
 
 sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-from utils import experience, experiment
+from utils import experience, experiment, wrapper
 from value_prediction import approximator
 from agents.dqn import MLP_TargetNetwork, get_transformed
 from agents import *
@@ -31,24 +32,26 @@ def main():
 
   key = random.PRNGKey(42)
   
-  gym_env = gym.make('ALE/BeamRider-v5')
-  env = sb3.common.atari_wrappers.AtariWrapper(gym_env1, 
+  env = gym.make('ALE/BeamRider-v5')
+  env = sb3.common.atari_wrappers.AtariWrapper(env, 
                         noop_max=30, 
                         frame_skip=4, 
                         screen_size=84, 
                         terminal_on_life_loss=True, 
-                        clip_reward=True)
-
-  tn = get_transformed(DQN_CNN, output_sizes= env.action_space.n)
+                        clip_reward=True) # (84,84,1)
+  # env = wrapper.Transpose(env, axes=(2,0,1)) # (1,84,84)
+  print(f"State space {env.action_space}, size {env.action_space.n}")
+  tn = get_transformed(DQN_CNN, output_size= env.action_space.n)
   epsilon = 1
-  # TODO : Make Dqn agent (based on barebone, i.e. no state normalization)
-  # agent = BarebonesDqn(env, 
-  #                     tn, 
-  #                     epsilon, 
-  #                     eps_decay_rate=config['eps_decay_rate'], 
-  #                     learning_rate=config['learning_rate'],
-  #                     delay_update=config['delay_update'])
-  acc = experience.Accumulator(501,3,10000)
+  look_back = 4
+  agent = BarebonesDqn(env, 
+                      tn, 
+                      epsilon, 
+                      look_back = look_back,
+                      eps_decay_rate=config['eps_decay_rate'], 
+                      learning_rate=config['learning_rate'],
+                      delay_update=config['delay_update'])
+  acc = experience.Accumulator(501,3,10000, look_back = look_back)
   trainer = experiment.Trainer(env, acc, onEpisodeSummary=onEpisodeSummary)
 
   train_episodes = 1000
