@@ -118,10 +118,10 @@ class BarebonesDqn(Agent):
     }
 
   def learn_batch_transitions(self, transitions):
-    s_tm1 = self.norm_state(transitions.s_tm1)
+    s_tm1 = transitions.s_tm1
     a_tm1 = transitions.a_tm1
     r_t = transitions.r_t
-    s_t = self.norm_state(transitions.s_t)
+    s_t = transitions.s_t
     
     self.replay_params, self.opt_state, self.recent_loss =self.step(self.replay_params,
                                                         self.target_params,
@@ -134,6 +134,3 @@ class BarebonesDqn(Agent):
     self.epsilon *= self.eps_decay_rate
     if not self.step_count%self.delay_update:
       self.target_params=self.replay_params
-
-  def norm_state(self, state):
-    return state/jnp.array([4.8, 10, 0.42, 10]) # Cartpole

@@ -6,7 +6,7 @@ from pathlib import Path
 import wandb
 
 sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-from utils import experience, experiment
+from utils import experience, experiment, wrapper
 from value_prediction import approximator
 from agents.dqn import MLP_TargetNetwork, get_transformed
 from agents import *
@@ -29,7 +29,7 @@ def main():
   )
 
   key = random.PRNGKey(42)
-  env = gym.make('CartPole-v1')
+  env = wrapper.Normalize(gym.make('CartPole-v1'), np.zeros(4), np.array([4.8, 10, 0.42, 10]))
   tn = get_transformed(MLP_TargetNetwork, output_sizes= [10, env.action_space.n]) # MLP [4, 10, 2]
   epsilon = 1
   agent = BarebonesDqn(env, 
